@@ -15,6 +15,7 @@ import os
 import re
 
 from github import Github
+import github3
 
 head = '''<table>
 <tr>'''
@@ -26,6 +27,26 @@ tail = '''
 def github_login(ACCESS_TOKEN, REPO_NAME):
     '''
     Use PyGithub to login to the repository
+
+    Args:
+        ACCESS_TOKEN (string): github Access Token
+        REPO_NAME (string): repository name
+
+    Returns:
+        github.Repository.Repository: object represents the repo
+
+    References:
+    ----------
+    [1]https://pygithub.readthedocs.io/en/latest/github_objects/Repository.html#github.Repository.Repository
+    '''
+    g = Github(ACCESS_TOKEN)
+    repo = g.get_repo(REPO_NAME)
+    return repo
+
+
+def github_login(USER_NAME, ACCESS_TOKEN):
+    '''
+    Use github3.py to login to the repository
 
     Args:
         ACCESS_TOKEN (string): github Access Token
@@ -58,6 +79,57 @@ def get_inputs(input_name):
     [1] https://help.github.com/en/actions/automating-your-workflow-with-github-actions/metadata-syntax-for-github-actions#example
     '''
     return os.getenv('INPUT_{}'.format(input_name).upper())
+
+
+def generate_team_members(repo, COLUMN_PER_ROW, img_width, font_size,
+                          head_format, tail_format, shape):
+    '''
+    Generate the contributors list using a given template
+
+    Args:
+        repo (github.Repository.Repository): object represents the repo
+        COLUMN_PER_ROW (int): number of contributors per row
+        img_width (int): width of img
+        font_size (int): font size of name
+        head_format (string): html_format for table head
+        tail_format (string): html_format for table tail
+        shape (string): round for round avatar and square for square avatar
+
+    Returns:
+        string: contributors list
+    '''
+    USER = 0
+    HEAD = head_format
+    TAIL = tail_format
+    contributors = repo.get_contributors()
+    for contributor in contributors:
+        name = contributor.name
+        avatar_url = contributor.avatar_url
+        html_url = contributor.html_url
+        if re.match('https://github.com/apps/', html_url):
+            continue
+        if name == None:
+            name = html_url[19:]
+        if USER >= COLUMN_PER_ROW:
+            new_tr = '''\n</tr>\n<tr>'''
+            HEAD = HEAD + new_tr
+            USER = 0
+        if shape == 'round':
+            img_style = ' style="border-radius:50%;align-items:center;justify-content:center;overflow:hidden;"'
+        else:
+            img_style = ''
+        td = f'''
+    <td align="center">
+        <a href={html_url}>
+            <img src={avatar_url} width="{img_width};"{img_style} alt={name}/>
+            <br />
+            <sub style="font-size:{font_size}px"><b>{name}</b></sub>
+        </a>
+    </td>'''
+        HEAD = HEAD + td
+        USER += 1
+    HEAD = HEAD + TAIL
+    return HEAD
 
 
 def generate_contributors(repo, COLUMN_PER_ROW, img_width, font_size,
@@ -148,6 +220,7 @@ def write_contributors(repo, contributors_list, path, commit_message, CONTRIB):
 def main():
     ACCESS_TOKEN = get_inputs('ACCESS_TOKEN')
     REPO_NAME = get_inputs('REPO_NAME')
+    TEAM = get_inputs('TEAM') + '\n\n'
     CONTRIBUTOR = get_inputs('CONTRIBUTOR') + '\n\n'
     COLUMN_PER_ROW = int(get_inputs('COLUMN_PER_ROW'))
     IMG_WIDTH = int(get_inputs('IMG_WIDTH'))
@@ -156,6 +229,10 @@ def main():
     COMMIT_MESSAGE = get_inputs('COMMIT_MESSAGE')
     AVATAR_SHAPE = get_inputs('AVATAR_SHAPE')
     repo = github_login(ACCESS_TOKEN, REPO_NAME)
+    
+    
+    TEAM_MEMBERS = generate_team_members(repo, COLUMN_PER_ROW, IMG_WIDTH, FONT_SIZE
+                                 head, tail, AVATAR_SHAPE)
     CONTRIBUTORS_LIST = generate_contributors(repo, COLUMN_PER_ROW, IMG_WIDTH,
                                               FONT_SIZE, head, tail,
                                               AVATAR_SHAPE)
