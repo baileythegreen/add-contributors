@@ -16,7 +16,7 @@ import re
 
 import github
 
-head = '''<table>
+head = '''<table style="margin-left:auto;margin-right:auto">
 <tr>'''
 tail = '''
 </tr>
